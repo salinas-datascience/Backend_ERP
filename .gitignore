@@ -1,0 +1,4 @@
+/_pycache/
+/venv/
+.env
+config_pgadmin.txt
