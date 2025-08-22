@@ -41,6 +41,25 @@ class ModelosMaquinas(Base):
     maquinas = relationship("Maquinas", back_populates="modelo")
 
 
+class Almacenamientos(Base):
+    """Modelo para lugares de almacenamiento de repuestos.
+    
+    Define ubicaciones estandarizadas donde se almacenan los repuestos,
+    facilitando la gestión del inventario y localización física.
+    """
+    __tablename__ = 'almacenamientos'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    codigo = Column(String, unique=True, nullable=False, index=True)
+    nombre = Column(String, nullable=False)
+    descripcion = Column(Text)
+    ubicacion_fisica = Column(String)  # Ej: "Planta 1 - Estante A"
+    activo = Column(Integer, default=1)  # 1=activo, 0=inactivo
+    
+    # Relación con repuestos
+    repuestos = relationship("Repuestos", back_populates="almacenamiento")
+
+
 class Maquinas(Base):
     """Modelo para las máquinas SMT individuales.
     
@@ -72,12 +91,14 @@ class Repuestos(Base):
     codigo = Column(String, unique=True, nullable=False, index=True)
     nombre = Column(String, nullable=False)
     detalle = Column(Text)
-    ubicacion = Column(String)
+    ubicacion = Column(String)  # Campo legacy, mantener por compatibilidad
+    almacenamiento_id = Column(Integer, ForeignKey('almacenamientos.id'))
     cantidad = Column(Integer, default=0)
     proveedor_id = Column(Integer, ForeignKey('proveedores.id'))
     
     # Relaciones
     proveedor = relationship("Proveedores", back_populates="repuestos")
+    almacenamiento = relationship("Almacenamientos", back_populates="repuestos")
     historial_repuestos = relationship("HistorialRepuestos", back_populates="repuesto")
 
 

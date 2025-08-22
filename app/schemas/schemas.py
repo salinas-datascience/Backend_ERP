@@ -30,6 +30,32 @@ class ProveedorResponse(ProveedorBase):
         from_attributes = True
 
 
+# === ALMACENAMIENTOS ===
+
+class AlmacenamientoBase(BaseModel):
+    codigo: str
+    nombre: str
+    descripcion: Optional[str] = None
+    ubicacion_fisica: Optional[str] = None
+    activo: int = 1
+
+class AlmacenamientoCreate(AlmacenamientoBase):
+    pass
+
+class AlmacenamientoUpdate(BaseModel):
+    codigo: Optional[str] = None
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+    ubicacion_fisica: Optional[str] = None
+    activo: Optional[int] = None
+
+class AlmacenamientoResponse(AlmacenamientoBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+
 # === MODELOS DE MÁQUINAS ===
 
 class ModeloMaquinaBase(BaseModel):
@@ -83,7 +109,8 @@ class RepuestoBase(BaseModel):
     codigo: str
     nombre: str
     detalle: Optional[str] = None
-    ubicacion: Optional[str] = None
+    ubicacion: Optional[str] = None  # Campo legacy para compatibilidad
+    almacenamiento_id: Optional[int] = None
     cantidad: int = 0
     proveedor_id: Optional[int] = None
 
@@ -95,12 +122,14 @@ class RepuestoUpdate(BaseModel):
     nombre: Optional[str] = None
     detalle: Optional[str] = None
     ubicacion: Optional[str] = None
+    almacenamiento_id: Optional[int] = None
     cantidad: Optional[int] = None
     proveedor_id: Optional[int] = None
 
 class RepuestoResponse(RepuestoBase):
     id: int
     proveedor: Optional[ProveedorResponse] = None
+    almacenamiento: Optional[AlmacenamientoResponse] = None
 
     class Config:
         from_attributes = True

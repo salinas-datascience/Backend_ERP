@@ -6,7 +6,7 @@ import os
 import sys
 from sqlalchemy import create_engine, text, Column, Integer, String, Text, ForeignKey, TIMESTAMP, func
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
 import time
 
@@ -43,6 +43,23 @@ class ModelosMaquinas(Base):
     
     maquinas = relationship("Maquinas", back_populates="modelo")
 
+class Almacenamientos(Base):
+    """Modelo para lugares de almacenamiento de repuestos.
+    
+    Define ubicaciones estandarizadas donde se almacenan los repuestos,
+    facilitando la gestión del inventario y localización física.
+    """
+    __tablename__ = 'almacenamientos'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    codigo = Column(String, unique=True, nullable=False)
+    nombre = Column(String, nullable=False)
+    descripcion = Column(Text)
+    ubicacion_fisica = Column(String)
+    activo = Column(Integer, default=1)
+    
+    repuestos = relationship("Repuestos", back_populates="almacenamiento")
+
 class Maquinas(Base):
     """Modelo para las máquinas SMT individuales.
     
@@ -72,11 +89,13 @@ class Repuestos(Base):
     codigo = Column(String, unique=True, nullable=False)
     nombre = Column(String, nullable=False)
     detalle = Column(Text)
-    ubicacion = Column(String)
+    ubicacion = Column(String)  # Campo legacy para compatibilidad
+    almacenamiento_id = Column(Integer, ForeignKey('almacenamientos.id'))
     cantidad = Column(Integer, default=0)
     proveedor_id = Column(Integer, ForeignKey('proveedores.id'))
     
     proveedor = relationship("Proveedores", back_populates="repuestos")
+    almacenamiento = relationship("Almacenamientos", back_populates="repuestos")
     historial_repuestos = relationship("HistorialRepuestos", back_populates="repuesto")
 
 class HistorialRepuestos(Base):
@@ -137,6 +156,97 @@ def create_tables(engine):
         print(f"❌ Error creando tablas: {e}")
         return False
 
+def create_sample_data(engine):
+    """Crear datos de ejemplo para el sistema"""
+    try:
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        db = SessionLocal()
+        
+        # Verificar si ya existen datos
+        if db.query(Almacenamientos).count() > 0:
+            print("✅ Datos de ejemplo ya existen")
+            db.close()
+            return True
+        
+        # Crear almacenamientos de ejemplo
+        almacenamientos = [
+            Almacenamientos(
+                codigo="A1-E1",
+                nombre="Estante A1",
+                descripcion="Estante principal para componentes pequeños",
+                ubicacion_fisica="Planta 1 - Zona A - Estante 1",
+                activo=1
+            ),
+            Almacenamientos(
+                codigo="A1-E2",
+                nombre="Estante A2",
+                descripcion="Estante para componentes medianos",
+                ubicacion_fisica="Planta 1 - Zona A - Estante 2",
+                activo=1
+            ),
+            Almacenamientos(
+                codigo="B1-E1",
+                nombre="Estante B1",
+                descripcion="Estante para componentes electrónicos",
+                ubicacion_fisica="Planta 1 - Zona B - Estante 1",
+                activo=1
+            ),
+            Almacenamientos(
+                codigo="C1-CAJ",
+                nombre="Cajón C1",
+                descripcion="Cajón para herramientas y consumibles",
+                ubicacion_fisica="Planta 1 - Zona C - Cajón 1",
+                activo=1
+            ),
+            Almacenamientos(
+                codigo="DEP-FRI",
+                nombre="Depósito Refrigerado",
+                descripcion="Depósito con temperatura controlada para componentes sensibles",
+                ubicacion_fisica="Planta 1 - Depósito Principal",
+                activo=1
+            ),
+        ]
+        
+        for almacenamiento in almacenamientos:
+            db.add(almacenamiento)
+        
+        # Crear proveedores de ejemplo
+        proveedores = [
+            Proveedores(
+                nombre="TechComponents SA",
+                contacto="Juan Pérez",
+                telefono="+54-11-1234-5678",
+                email="ventas@techcomponents.com"
+            ),
+            Proveedores(
+                nombre="ElectroSuministros",
+                contacto="María García",
+                telefono="+54-11-8765-4321",
+                email="pedidos@electrosuministros.com"
+            ),
+            Proveedores(
+                nombre="SMT Solutions",
+                contacto="Carlos Rodriguez",
+                telefono="+54-11-5555-6666",
+                email="info@smtsolutions.com"
+            ),
+        ]
+        
+        for proveedor in proveedores:
+            db.add(proveedor)
+        
+        db.commit()
+        print("✅ Datos de ejemplo creados exitosamente")
+        db.close()
+        return True
+        
+    except SQLAlchemyError as e:
+        print(f"❌ Error creando datos de ejemplo: {e}")
+        if 'db' in locals():
+            db.rollback()
+            db.close()
+        return False
+
 def main():
     """Función principal"""
     # Obtener URL de la base de datos
@@ -161,6 +271,10 @@ def main():
         
         # Crear tablas
         if not create_tables(engine):
+            sys.exit(1)
+        
+        # Crear datos de ejemplo
+        if not create_sample_data(engine):
             sys.exit(1)
         
         print("🎉 Inicialización completada exitosamente")
