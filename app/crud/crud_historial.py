@@ -5,53 +5,53 @@ from typing import List, Optional
 from datetime import datetime, date
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_
-from models.models import HistorialRepuestos, Repuestos
+from models.models import HistorialRepuestos, Repuestos, Maquinas, ModelosMaquinas
 from schemas.schemas import HistorialRepuestoCreate, HistorialRepuestoUpdate
 
 
 def get_historial_repuestos(db: Session, skip: int = 0, limit: int = 100) -> List[HistorialRepuestos]:
-    """Obtener lista de historial con paginación incluyendo repuesto y máquina"""
+    """Obtener lista de historial con paginación incluyendo repuesto y máquina ordenado por fecha descendente"""
     return db.query(HistorialRepuestos).options(
         joinedload(HistorialRepuestos.repuesto),
-        joinedload(HistorialRepuestos.maquina).joinedload('modelo')
-    ).offset(skip).limit(limit).all()
+        joinedload(HistorialRepuestos.maquina).joinedload(Maquinas.modelo)
+    ).order_by(HistorialRepuestos.fecha.desc()).offset(skip).limit(limit).all()
 
 
 def get_historial_repuesto(db: Session, historial_id: int) -> Optional[HistorialRepuestos]:
     """Obtener historial por ID incluyendo relaciones"""
     return db.query(HistorialRepuestos).options(
         joinedload(HistorialRepuestos.repuesto),
-        joinedload(HistorialRepuestos.maquina).joinedload('modelo')
+        joinedload(HistorialRepuestos.maquina).joinedload(Maquinas.modelo)
     ).filter(HistorialRepuestos.id == historial_id).first()
 
 
 def get_historial_by_repuesto(db: Session, repuesto_id: int) -> List[HistorialRepuestos]:
-    """Obtener historial por repuesto"""
+    """Obtener historial por repuesto ordenado por fecha descendente"""
     return db.query(HistorialRepuestos).options(
         joinedload(HistorialRepuestos.repuesto),
-        joinedload(HistorialRepuestos.maquina).joinedload('modelo')
-    ).filter(HistorialRepuestos.repuesto_id == repuesto_id).all()
+        joinedload(HistorialRepuestos.maquina).joinedload(Maquinas.modelo)
+    ).filter(HistorialRepuestos.repuesto_id == repuesto_id).order_by(HistorialRepuestos.fecha.desc()).all()
 
 
 def get_historial_by_maquina(db: Session, maquina_id: int) -> List[HistorialRepuestos]:
-    """Obtener historial por máquina"""
+    """Obtener historial por máquina ordenado por fecha descendente"""
     return db.query(HistorialRepuestos).options(
         joinedload(HistorialRepuestos.repuesto),
-        joinedload(HistorialRepuestos.maquina).joinedload('modelo')
-    ).filter(HistorialRepuestos.maquina_id == maquina_id).all()
+        joinedload(HistorialRepuestos.maquina).joinedload(Maquinas.modelo)
+    ).filter(HistorialRepuestos.maquina_id == maquina_id).order_by(HistorialRepuestos.fecha.desc()).all()
 
 
 def get_historial_by_fecha_rango(db: Session, fecha_inicio: date, fecha_fin: date) -> List[HistorialRepuestos]:
-    """Obtener historial por rango de fechas"""
+    """Obtener historial por rango de fechas ordenado por fecha descendente"""
     return db.query(HistorialRepuestos).options(
         joinedload(HistorialRepuestos.repuesto),
-        joinedload(HistorialRepuestos.maquina).joinedload('modelo')
+        joinedload(HistorialRepuestos.maquina).joinedload(Maquinas.modelo)
     ).filter(
         and_(
             HistorialRepuestos.fecha >= fecha_inicio,
             HistorialRepuestos.fecha <= fecha_fin
         )
-    ).all()
+    ).order_by(HistorialRepuestos.fecha.desc()).all()
 
 
 def create_historial_repuesto(db: Session, historial: HistorialRepuestoCreate) -> HistorialRepuestos:
