@@ -94,6 +94,7 @@ class Repuestos(Base):
     ubicacion = Column(String)  # Campo legacy, mantener por compatibilidad
     almacenamiento_id = Column(Integer, ForeignKey('almacenamientos.id'))
     cantidad = Column(Integer, default=0)
+    cantidad_minima = Column(Integer, nullable=True)  # Cantidad mínima personalizada para alertas
     proveedor_id = Column(Integer, ForeignKey('proveedores.id'))
     
     # Relaciones

@@ -73,11 +73,11 @@ def listar_repuestos_por_proveedor(
 
 @router.get("/stock/bajo", response_model=List[RepuestoResponse])
 def listar_repuestos_bajo_stock(
-    cantidad_minima: int = 10,
+    cantidad_minima_default: int = 10,
     db: Session = Depends(get_db)
 ):
-    """Obtener repuestos con stock bajo"""
-    repuestos = crud_repuestos.get_repuestos_bajo_stock(db, cantidad_minima=cantidad_minima)
+    """Obtener repuestos con stock bajo usando cantidad mínima personalizada o default"""
+    repuestos = crud_repuestos.get_repuestos_bajo_stock(db, cantidad_minima_default=cantidad_minima_default)
     return repuestos
 
 

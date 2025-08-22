@@ -112,6 +112,7 @@ class RepuestoBase(BaseModel):
     ubicacion: Optional[str] = None  # Campo legacy para compatibilidad
     almacenamiento_id: Optional[int] = None
     cantidad: int = 0
+    cantidad_minima: Optional[int] = None  # Cantidad mínima personalizada para alertas
     proveedor_id: Optional[int] = None
 
 class RepuestoCreate(RepuestoBase):
@@ -124,6 +125,7 @@ class RepuestoUpdate(BaseModel):
     ubicacion: Optional[str] = None
     almacenamiento_id: Optional[int] = None
     cantidad: Optional[int] = None
+    cantidad_minima: Optional[int] = None
     proveedor_id: Optional[int] = None
 
 class RepuestoResponse(RepuestoBase):

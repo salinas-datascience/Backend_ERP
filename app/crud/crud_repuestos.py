@@ -8,13 +8,19 @@ from schemas.schemas import RepuestoCreate, RepuestoUpdate
 
 
 def get_repuestos(db: Session, skip: int = 0, limit: int = 100) -> List[Repuestos]:
-    """Obtener lista de repuestos con paginación incluyendo proveedor"""
-    return db.query(Repuestos).options(joinedload(Repuestos.proveedor)).offset(skip).limit(limit).all()
+    """Obtener lista de repuestos con paginación incluyendo proveedor y almacenamiento"""
+    return db.query(Repuestos).options(
+        joinedload(Repuestos.proveedor),
+        joinedload(Repuestos.almacenamiento)
+    ).offset(skip).limit(limit).all()
 
 
 def get_repuesto(db: Session, repuesto_id: int) -> Optional[Repuestos]:
-    """Obtener repuesto por ID incluyendo proveedor"""
-    return db.query(Repuestos).options(joinedload(Repuestos.proveedor)).filter(Repuestos.id == repuesto_id).first()
+    """Obtener repuesto por ID incluyendo proveedor y almacenamiento"""
+    return db.query(Repuestos).options(
+        joinedload(Repuestos.proveedor),
+        joinedload(Repuestos.almacenamiento)
+    ).filter(Repuestos.id == repuesto_id).first()
 
 
 def get_repuesto_by_codigo(db: Session, codigo: str) -> Optional[Repuestos]:
@@ -24,12 +30,27 @@ def get_repuesto_by_codigo(db: Session, codigo: str) -> Optional[Repuestos]:
 
 def get_repuestos_by_proveedor(db: Session, proveedor_id: int) -> List[Repuestos]:
     """Obtener repuestos por proveedor"""
-    return db.query(Repuestos).options(joinedload(Repuestos.proveedor)).filter(Repuestos.proveedor_id == proveedor_id).all()
+    return db.query(Repuestos).options(
+        joinedload(Repuestos.proveedor),
+        joinedload(Repuestos.almacenamiento)
+    ).filter(Repuestos.proveedor_id == proveedor_id).all()
 
 
-def get_repuestos_bajo_stock(db: Session, cantidad_minima: int = 10) -> List[Repuestos]:
-    """Obtener repuestos con stock bajo"""
-    return db.query(Repuestos).options(joinedload(Repuestos.proveedor)).filter(Repuestos.cantidad <= cantidad_minima).all()
+def get_repuestos_bajo_stock(db: Session, cantidad_minima_default: int = 10) -> List[Repuestos]:
+    """Obtener repuestos con stock bajo usando cantidad mínima personalizada o default"""
+    from sqlalchemy import case, or_
+    
+    return db.query(Repuestos).options(
+        joinedload(Repuestos.proveedor),
+        joinedload(Repuestos.almacenamiento)
+    ).filter(
+        or_(
+            # Usar cantidad_minima personalizada si está definida
+            (Repuestos.cantidad_minima.isnot(None)) & (Repuestos.cantidad <= Repuestos.cantidad_minima),
+            # Usar cantidad_minima_default si no hay personalizada
+            (Repuestos.cantidad_minima.is_(None)) & (Repuestos.cantidad <= cantidad_minima_default)
+        )
+    ).all()
 
 
 def create_repuesto(db: Session, repuesto: RepuestoCreate) -> Repuestos:
