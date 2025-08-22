@@ -1,9 +1,113 @@
 """
 Modelos ORM SQLAlchemy para el sistema de gestión de repuestos SMT
 """
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, TIMESTAMP, func
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, TIMESTAMP, func, Boolean, Table
 from sqlalchemy.orm import relationship
 from database import Base
+
+
+# Tablas de asociación para relaciones muchos a muchos
+roles_permisos = Table(
+    'roles_permisos',
+    Base.metadata,
+    Column('rol_id', Integer, ForeignKey('roles.id'), primary_key=True),
+    Column('permiso_id', Integer, ForeignKey('permisos.id'), primary_key=True)
+)
+
+usuarios_paginas = Table(
+    'usuarios_paginas',
+    Base.metadata,
+    Column('usuario_id', Integer, ForeignKey('usuarios.id'), primary_key=True),
+    Column('pagina_id', Integer, ForeignKey('paginas.id'), primary_key=True)
+)
+
+
+class Usuarios(Base):
+    """Modelo para la gestión de usuarios del sistema.
+    
+    Almacena información de autenticación y datos básicos de los usuarios
+    que tienen acceso al sistema ERP.
+    """
+    __tablename__ = 'usuarios'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    username = Column(String, unique=True, nullable=False, index=True)
+    email = Column(String, unique=True, nullable=False, index=True)
+    hashed_password = Column(String, nullable=False)
+    nombre_completo = Column(String)
+    activo = Column(Boolean, default=True)
+    es_admin = Column(Boolean, default=False)
+    rol_id = Column(Integer, ForeignKey('roles.id'))
+    fecha_creacion = Column(TIMESTAMP, default=func.now())
+    ultima_conexion = Column(TIMESTAMP)
+    # Campos para gestión de contraseñas
+    debe_cambiar_password = Column(Boolean, default=True)  # Forzar cambio en primer login
+    fecha_cambio_password = Column(TIMESTAMP)
+    intentos_fallidos = Column(Integer, default=0)
+    bloqueado_hasta = Column(TIMESTAMP)  # Bloqueo temporal por intentos fallidos
+    
+    # Relaciones
+    rol = relationship("Roles", back_populates="usuarios")
+    paginas_permitidas = relationship("Paginas", secondary=usuarios_paginas, back_populates="usuarios")
+
+
+class Roles(Base):
+    """Modelo para roles del sistema.
+    
+    Define diferentes niveles de acceso como admin, supervisor, operador, etc.
+    """
+    __tablename__ = 'roles'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    nombre = Column(String, unique=True, nullable=False)
+    descripcion = Column(Text)
+    activo = Column(Boolean, default=True)
+    fecha_creacion = Column(TIMESTAMP, default=func.now())
+    
+    # Relaciones
+    usuarios = relationship("Usuarios", back_populates="rol")
+    permisos = relationship("Permisos", secondary=roles_permisos, back_populates="roles")
+
+
+class Permisos(Base):
+    """Modelo para permisos específicos del sistema.
+    
+    Define acciones específicas que pueden realizar los usuarios
+    como ver_repuestos, editar_maquinas, etc.
+    """
+    __tablename__ = 'permisos'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    nombre = Column(String, unique=True, nullable=False)
+    descripcion = Column(Text)
+    recurso = Column(String, nullable=False)  # ej: repuestos, maquinas, usuarios
+    accion = Column(String, nullable=False)   # ej: crear, leer, actualizar, eliminar
+    activo = Column(Boolean, default=True)
+    
+    # Relaciones
+    roles = relationship("Roles", secondary=roles_permisos, back_populates="permisos")
+
+
+class Paginas(Base):
+    """Modelo para páginas del sistema.
+    
+    Define las diferentes páginas/secciones del frontend que pueden
+    ser asignadas a usuarios específicos.
+    """
+    __tablename__ = 'paginas'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    nombre = Column(String, unique=True, nullable=False)
+    ruta = Column(String, unique=True, nullable=False)  # ej: /repuestos, /maquinas
+    titulo = Column(String, nullable=False)
+    descripcion = Column(Text)
+    icono = Column(String)  # clase CSS del icono
+    orden = Column(Integer, default=0)  # para ordenar en el menú
+    activa = Column(Boolean, default=True)
+    solo_admin = Column(Boolean, default=False)  # páginas exclusivas para admin
+    
+    # Relaciones
+    usuarios = relationship("Usuarios", secondary=usuarios_paginas, back_populates="paginas_permitidas")
 
 
 class Proveedores(Base):

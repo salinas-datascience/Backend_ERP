@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar el código de la aplicación
 COPY ./app .
+COPY init_user_system.py /app/init_user_system.py
 
 # Dar permisos al usuario fastapi
 RUN chown -R fastapi:fastapi /app
@@ -24,5 +25,5 @@ USER fastapi
 
 EXPOSE 8000
 
-# Comando para ejecutar
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Comando para ejecutar con inicialización
+CMD ["sh", "-c", "python init_user_system.py && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"]

@@ -162,3 +162,153 @@ class HistorialRepuestoResponse(HistorialRepuestoBase):
 
     class Config:
         from_attributes = True
+
+
+# === AUTENTICACIÓN Y USUARIOS ===
+
+class UsuarioBase(BaseModel):
+    username: str
+    email: str
+    nombre_completo: Optional[str] = None
+    activo: bool = True
+    es_admin: bool = False
+    rol_id: Optional[int] = None
+
+class UsuarioCreate(UsuarioBase):
+    password: str
+    debe_cambiar_password: bool = True
+
+class UsuarioUpdate(BaseModel):
+    username: Optional[str] = None
+    email: Optional[str] = None
+    nombre_completo: Optional[str] = None
+    activo: Optional[bool] = None
+    es_admin: Optional[bool] = None
+    rol_id: Optional[int] = None
+
+class UsuarioResponse(UsuarioBase):
+    id: int
+    fecha_creacion: datetime
+    ultima_conexion: Optional[datetime] = None
+    debe_cambiar_password: bool
+    fecha_cambio_password: Optional[datetime] = None
+    intentos_fallidos: int
+    bloqueado_hasta: Optional[datetime] = None
+    rol: Optional["RolResponse"] = None
+    paginas_permitidas: List["PaginaResponse"] = []
+
+    class Config:
+        from_attributes = True
+
+class ChangePasswordRequest(BaseModel):
+    password_actual: str
+    password_nueva: str
+    confirmar_password: str
+
+class ResetPasswordRequest(BaseModel):
+    usuario_id: int
+    password_nueva: str
+    forzar_cambio: bool = True
+
+
+# === ROLES ===
+
+class RolBase(BaseModel):
+    nombre: str
+    descripcion: Optional[str] = None
+    activo: bool = True
+
+class RolCreate(RolBase):
+    permisos_ids: List[int] = []
+
+class RolUpdate(BaseModel):
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+    activo: Optional[bool] = None
+    permisos_ids: Optional[List[int]] = None
+
+class RolResponse(RolBase):
+    id: int
+    fecha_creacion: datetime
+    permisos: List["PermisoResponse"] = []
+
+    class Config:
+        from_attributes = True
+
+
+# === PERMISOS ===
+
+class PermisoBase(BaseModel):
+    nombre: str
+    descripcion: Optional[str] = None
+    recurso: str
+    accion: str
+    activo: bool = True
+
+class PermisoCreate(PermisoBase):
+    pass
+
+class PermisoUpdate(BaseModel):
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+    recurso: Optional[str] = None
+    accion: Optional[str] = None
+    activo: Optional[bool] = None
+
+class PermisoResponse(PermisoBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+
+# === PÁGINAS ===
+
+class PaginaBase(BaseModel):
+    nombre: str
+    ruta: str
+    titulo: str
+    descripcion: Optional[str] = None
+    icono: Optional[str] = None
+    orden: int = 0
+    activa: bool = True
+    solo_admin: bool = False
+
+class PaginaCreate(PaginaBase):
+    pass
+
+class PaginaUpdate(BaseModel):
+    nombre: Optional[str] = None
+    ruta: Optional[str] = None
+    titulo: Optional[str] = None
+    descripcion: Optional[str] = None
+    icono: Optional[str] = None
+    orden: Optional[int] = None
+    activa: Optional[bool] = None
+    solo_admin: Optional[bool] = None
+
+class PaginaResponse(PaginaBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+class AsignarPaginasRequest(BaseModel):
+    usuario_id: int
+    paginas_ids: List[int]
+
+
+# === AUTENTICACIÓN ===
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str
+    usuario: UsuarioResponse
+    expires_in: int
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
