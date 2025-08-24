@@ -4,10 +4,11 @@ Script para inicializar la base de datos
 """
 import os
 import sys
-from sqlalchemy import create_engine, text, Column, Integer, String, Text, ForeignKey, TIMESTAMP, func
+from sqlalchemy import create_engine, text, Column, Integer, String, Text, ForeignKey, TIMESTAMP, func, Boolean, Table
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
+from passlib.context import CryptContext
 import time
 
 Base = declarative_base()
@@ -115,6 +116,85 @@ class HistorialRepuestos(Base):
     
     repuesto = relationship("Repuestos", back_populates="historial_repuestos")
     maquina = relationship("Maquinas", back_populates="historial_repuestos")
+
+# Tablas de asociación para el sistema de usuarios
+roles_permisos = Table(
+    'roles_permisos',
+    Base.metadata,
+    Column('rol_id', Integer, ForeignKey('roles.id'), primary_key=True),
+    Column('permiso_id', Integer, ForeignKey('permisos.id'), primary_key=True)
+)
+
+usuarios_paginas = Table(
+    'usuarios_paginas',
+    Base.metadata,
+    Column('usuario_id', Integer, ForeignKey('usuarios.id'), primary_key=True),
+    Column('pagina_id', Integer, ForeignKey('paginas.id'), primary_key=True)
+)
+
+class Usuarios(Base):
+    """Modelo para la gestión de usuarios del sistema."""
+    __tablename__ = 'usuarios'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    username = Column(String, unique=True, nullable=False, index=True)
+    email = Column(String, unique=True, nullable=False, index=True)
+    hashed_password = Column(String, nullable=False)
+    nombre_completo = Column(String)
+    activo = Column(Boolean, default=True)
+    es_admin = Column(Boolean, default=False)
+    rol_id = Column(Integer, ForeignKey('roles.id'))
+    fecha_creacion = Column(TIMESTAMP, default=func.now())
+    ultima_conexion = Column(TIMESTAMP)
+    debe_cambiar_password = Column(Boolean, default=True)
+    fecha_cambio_password = Column(TIMESTAMP)
+    intentos_fallidos = Column(Integer, default=0)
+    bloqueado_hasta = Column(TIMESTAMP)
+    
+    rol = relationship("Roles", back_populates="usuarios")
+    paginas_permitidas = relationship("Paginas", secondary=usuarios_paginas, back_populates="usuarios")
+
+class Roles(Base):
+    """Modelo para roles del sistema."""
+    __tablename__ = 'roles'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    nombre = Column(String, unique=True, nullable=False)
+    descripcion = Column(Text)
+    activo = Column(Boolean, default=True)
+    fecha_creacion = Column(TIMESTAMP, default=func.now())
+    
+    usuarios = relationship("Usuarios", back_populates="rol")
+    permisos = relationship("Permisos", secondary=roles_permisos, back_populates="roles")
+
+class Permisos(Base):
+    """Modelo para permisos granulares."""
+    __tablename__ = 'permisos'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    nombre = Column(String, unique=True, nullable=False)
+    descripcion = Column(Text)
+    recurso = Column(String, nullable=False)
+    accion = Column(String, nullable=False)
+    activo = Column(Boolean, default=True)
+    
+    roles = relationship("Roles", secondary=roles_permisos, back_populates="permisos")
+
+class Paginas(Base):
+    """Modelo para páginas del sistema."""
+    __tablename__ = 'paginas'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    nombre = Column(String, unique=True, nullable=False)
+    ruta = Column(String, unique=True, nullable=False)
+    titulo = Column(String, nullable=False)
+    descripcion = Column(Text)
+    icono = Column(String)
+    orden = Column(Integer, default=0)
+    activa = Column(Boolean, default=True)
+    solo_admin = Column(Boolean, default=False)
+    
+    usuarios = relationship("Usuarios", secondary=usuarios_paginas, back_populates="paginas_permitidas")
 
 def wait_for_db(engine, max_retries=30):
     """Espera a que la base de datos esté disponible"""
@@ -247,6 +327,216 @@ def create_sample_data(engine):
             db.close()
         return False
 
+def create_system_pages(engine):
+    """Crear las páginas del sistema"""
+    try:
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        db = SessionLocal()
+        
+        # Verificar si ya existen páginas
+        if db.query(Paginas).count() > 0:
+            print("✅ Páginas del sistema ya existen")
+            db.close()
+            return True
+        
+        print("🔧 Creando páginas del sistema...")
+        
+        # Definir páginas del sistema
+        paginas_sistema = [
+            {
+                "nombre": "repuestos",
+                "ruta": "/repuestos",
+                "titulo": "Gestión de Repuestos",
+                "descripcion": "Administrar inventario de repuestos y componentes",
+                "icono": "Package",
+                "orden": 1,
+                "activa": True,
+                "solo_admin": False
+            },
+            {
+                "nombre": "proveedores",
+                "ruta": "/proveedores",
+                "titulo": "Gestión de Proveedores", 
+                "descripcion": "Administrar proveedores y contactos",
+                "icono": "Users",
+                "orden": 2,
+                "activa": True,
+                "solo_admin": False
+            },
+            {
+                "nombre": "maquinas",
+                "ruta": "/maquinas",
+                "titulo": "Gestión de Máquinas",
+                "descripcion": "Administrar máquinas y equipos",
+                "icono": "Settings",
+                "orden": 3,
+                "activa": True,
+                "solo_admin": False
+            },
+            {
+                "nombre": "modelos_maquinas",
+                "ruta": "/modelos-maquinas",
+                "titulo": "Modelos de Máquinas",
+                "descripcion": "Administrar modelos y tipos de máquinas",
+                "icono": "Cpu",
+                "orden": 4,
+                "activa": True,
+                "solo_admin": False
+            },
+            {
+                "nombre": "historial",
+                "ruta": "/historial",
+                "titulo": "Historial del Sistema",
+                "descripcion": "Ver historial de movimientos y cambios",
+                "icono": "History",
+                "orden": 5,
+                "activa": True,
+                "solo_admin": False
+            },
+            # Páginas administrativas
+            {
+                "nombre": "admin_dashboard",
+                "ruta": "/admin",
+                "titulo": "Panel de Administración",
+                "descripcion": "Dashboard principal de administración",
+                "icono": "Shield",
+                "orden": 10,
+                "activa": True,
+                "solo_admin": True
+            },
+            {
+                "nombre": "admin_usuarios",
+                "ruta": "/admin/usuarios",
+                "titulo": "Gestión de Usuarios",
+                "descripcion": "Administrar usuarios del sistema",
+                "icono": "Users",
+                "orden": 11,
+                "activa": True,
+                "solo_admin": True
+            },
+            {
+                "nombre": "admin_roles",
+                "ruta": "/admin/roles",
+                "titulo": "Gestión de Roles",
+                "descripcion": "Administrar roles del sistema",
+                "icono": "Shield",
+                "orden": 12,
+                "activa": True,
+                "solo_admin": True
+            },
+            {
+                "nombre": "admin_permisos",
+                "ruta": "/admin/permisos",
+                "titulo": "Gestión de Permisos",
+                "descripcion": "Administrar permisos granulares",
+                "icono": "Key",
+                "orden": 13,
+                "activa": True,
+                "solo_admin": True
+            }
+        ]
+        
+        # Crear páginas
+        for page_data in paginas_sistema:
+            nueva_pagina = Paginas(
+                nombre=page_data["nombre"],
+                ruta=page_data["ruta"],
+                titulo=page_data["titulo"],
+                descripcion=page_data["descripcion"],
+                icono=page_data["icono"],
+                orden=page_data["orden"],
+                activa=page_data["activa"],
+                solo_admin=page_data["solo_admin"]
+            )
+            db.add(nueva_pagina)
+            print(f"✅ Página creada: {page_data['titulo']}")
+        
+        db.commit()
+        print("✅ Páginas del sistema creadas exitosamente")
+        db.close()
+        return True
+        
+    except SQLAlchemyError as e:
+        print(f"❌ Error creando páginas del sistema: {e}")
+        if 'db' in locals():
+            db.rollback()
+            db.close()
+        return False
+
+def create_admin_user(engine):
+    """Crear usuario administrador y asignar todas las páginas"""
+    try:
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        db = SessionLocal()
+        
+        # Verificar si ya existe el usuario admin
+        admin_user = db.query(Usuarios).filter(Usuarios.username == 'admin').first()
+        
+        if admin_user:
+            print("✅ Usuario admin ya existe")
+            # Asegurar que tenga todas las páginas asignadas
+            todas_las_paginas = db.query(Paginas).all()
+            admin_user.paginas_permitidas.clear()
+            for pagina in todas_las_paginas:
+                admin_user.paginas_permitidas.append(pagina)
+            db.commit()
+            print(f"✅ {len(todas_las_paginas)} páginas asignadas al admin")
+            db.close()
+            return True
+        
+        print("🔧 Creando usuario administrador...")
+        
+        # Crear contexto de encriptación
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        
+        # Crear rol de administrador
+        admin_role = db.query(Roles).filter(Roles.nombre == 'Administrador').first()
+        if not admin_role:
+            admin_role = Roles(
+                nombre='Administrador',
+                descripcion='Rol con acceso completo al sistema',
+                activo=True
+            )
+            db.add(admin_role)
+            db.flush()
+        
+        # Crear usuario admin
+        admin_user = Usuarios(
+            username='admin',
+            email='admin@empresa.com',
+            hashed_password=pwd_context.hash('admin123'),
+            nombre_completo='Administrador del Sistema',
+            activo=True,
+            es_admin=True,
+            rol_id=admin_role.id,
+            debe_cambiar_password=True
+        )
+        db.add(admin_user)
+        db.flush()
+        
+        # Asignar todas las páginas al admin
+        todas_las_paginas = db.query(Paginas).all()
+        for pagina in todas_las_paginas:
+            admin_user.paginas_permitidas.append(pagina)
+        
+        db.commit()
+        
+        print("✅ Usuario administrador creado:")
+        print("   Usuario: admin")
+        print("   Contraseña: admin123")
+        print(f"   Páginas asignadas: {len(todas_las_paginas)}")
+        print("   ⚠️  IMPORTANTE: Cambiar contraseña en primer login")
+        
+        db.close()
+        return True
+        
+    except SQLAlchemyError as e:
+        print(f"❌ Error creando usuario admin: {e}")
+        if 'db' in locals():
+            db.rollback()
+            db.close()
+        return False
+
 def main():
     """Función principal"""
     # Obtener URL de la base de datos
@@ -277,7 +567,16 @@ def main():
         if not create_sample_data(engine):
             sys.exit(1)
         
+        # Crear páginas del sistema
+        if not create_system_pages(engine):
+            sys.exit(1)
+        
+        # Crear usuario admin con páginas asignadas
+        if not create_admin_user(engine):
+            sys.exit(1)
+        
         print("🎉 Inicialización completada exitosamente")
+        print("📋 Sistema listo con páginas y usuario admin configurados")
         
     except Exception as e:
         print(f"❌ Error general: {e}")

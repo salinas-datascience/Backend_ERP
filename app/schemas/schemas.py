@@ -140,13 +140,16 @@ class RepuestoResponse(RepuestoBase):
 # === HISTORIAL DE REPUESTOS ===
 
 class HistorialRepuestoBase(BaseModel):
+    repuesto_id: Optional[int] = None
+    maquina_id: Optional[int] = None
+    cantidad_usada: int
+    observaciones: Optional[str] = None
+
+class HistorialRepuestoCreate(BaseModel):
     repuesto_id: int
     maquina_id: int
     cantidad_usada: int
     observaciones: Optional[str] = None
-
-class HistorialRepuestoCreate(HistorialRepuestoBase):
-    pass
 
 class HistorialRepuestoUpdate(BaseModel):
     repuesto_id: Optional[int] = None
