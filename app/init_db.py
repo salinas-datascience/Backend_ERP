@@ -93,6 +93,7 @@ class Repuestos(Base):
     ubicacion = Column(String)  # Campo legacy para compatibilidad
     almacenamiento_id = Column(Integer, ForeignKey('almacenamientos.id'))
     cantidad = Column(Integer, default=0)
+    cantidad_minima = Column(Integer)
     proveedor_id = Column(Integer, ForeignKey('proveedores.id'))
     
     proveedor = relationship("Proveedores", back_populates="repuestos")
@@ -202,13 +203,13 @@ def wait_for_db(engine, max_retries=30):
         try:
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
-                print("✅ Base de datos conectada")
+                print("Base de datos conectada")
                 return True
         except SQLAlchemyError as e:
-            print(f"🔄 Esperando base de datos... intento {i+1}/{max_retries}")
+            print(f"Esperando base de datos... intento {i+1}/{max_retries}")
             time.sleep(2)
     
-    print("❌ No se pudo conectar a la base de datos")
+    print("No se pudo conectar a la base de datos")
     return False
 
 def init_database(engine):
@@ -218,10 +219,10 @@ def init_database(engine):
             # Crear extensiones que puedan ser útiles
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\""))
             conn.commit()
-            print("✅ Base de datos inicializada")
+            print("Base de datos inicializada")
             
     except SQLAlchemyError as e:
-        print(f"❌ Error inicializando base de datos: {e}")
+        print(f"Error inicializando base de datos: {e}")
         return False
     
     return True
@@ -230,10 +231,10 @@ def create_tables(engine):
     """Crear todas las tablas del sistema de gestión de repuestos"""
     try:
         Base.metadata.create_all(engine)
-        print("✅ Tablas creadas exitosamente")
+        print("Tablas creadas exitosamente")
         return True
     except SQLAlchemyError as e:
-        print(f"❌ Error creando tablas: {e}")
+        print(f"ERROR: Error creando tablas: {e}")
         return False
 
 def create_sample_data(engine):
@@ -244,7 +245,7 @@ def create_sample_data(engine):
         
         # Verificar si ya existen datos
         if db.query(Almacenamientos).count() > 0:
-            print("✅ Datos de ejemplo ya existen")
+            print("Datos de ejemplo ya existen")
             db.close()
             return True
         
@@ -316,12 +317,12 @@ def create_sample_data(engine):
             db.add(proveedor)
         
         db.commit()
-        print("✅ Datos de ejemplo creados exitosamente")
+        print("Datos de ejemplo creados exitosamente")
         db.close()
         return True
         
     except SQLAlchemyError as e:
-        print(f"❌ Error creando datos de ejemplo: {e}")
+        print(f"ERROR: Error creando datos de ejemplo: {e}")
         if 'db' in locals():
             db.rollback()
             db.close()
@@ -335,11 +336,11 @@ def create_system_pages(engine):
         
         # Verificar si ya existen páginas
         if db.query(Paginas).count() > 0:
-            print("✅ Páginas del sistema ya existen")
+            print("Páginas del sistema ya existen")
             db.close()
             return True
         
-        print("🔧 Creando páginas del sistema...")
+        print("Creando páginas del sistema...")
         
         # Definir páginas del sistema
         paginas_sistema = [
@@ -433,6 +434,16 @@ def create_system_pages(engine):
                 "orden": 13,
                 "activa": True,
                 "solo_admin": True
+            },
+            {
+                "nombre": "almacenamientos",
+                "ruta": "/almacenamientos",
+                "titulo": "Almacenamientos",
+                "descripcion": "Gestión de ubicaciones de almacenamiento",
+                "icono": "Warehouse",
+                "orden": 6,
+                "activa": True,
+                "solo_admin": False
             }
         ]
         
@@ -449,15 +460,15 @@ def create_system_pages(engine):
                 solo_admin=page_data["solo_admin"]
             )
             db.add(nueva_pagina)
-            print(f"✅ Página creada: {page_data['titulo']}")
+            print(f"Página creada: {page_data['titulo']}")
         
         db.commit()
-        print("✅ Páginas del sistema creadas exitosamente")
+        print("Páginas del sistema creadas exitosamente")
         db.close()
         return True
         
     except SQLAlchemyError as e:
-        print(f"❌ Error creando páginas del sistema: {e}")
+        print(f"ERROR: Error creando páginas del sistema: {e}")
         if 'db' in locals():
             db.rollback()
             db.close()
@@ -473,18 +484,18 @@ def create_admin_user(engine):
         admin_user = db.query(Usuarios).filter(Usuarios.username == 'admin').first()
         
         if admin_user:
-            print("✅ Usuario admin ya existe")
+            print("Usuario admin ya existe")
             # Asegurar que tenga todas las páginas asignadas
             todas_las_paginas = db.query(Paginas).all()
             admin_user.paginas_permitidas.clear()
             for pagina in todas_las_paginas:
                 admin_user.paginas_permitidas.append(pagina)
             db.commit()
-            print(f"✅ {len(todas_las_paginas)} páginas asignadas al admin")
+            print(f"{len(todas_las_paginas)} páginas asignadas al admin")
             db.close()
             return True
         
-        print("🔧 Creando usuario administrador...")
+        print("Creando usuario administrador...")
         
         # Crear contexto de encriptación
         pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -514,6 +525,42 @@ def create_admin_user(engine):
         db.add(admin_user)
         db.flush()
         
+        # Crear permisos básicos si no existen
+        permisos_basicos = [
+            ("usuarios_leer", "Ver usuarios del sistema", "usuarios", "leer"),
+            ("usuarios_crear", "Crear nuevos usuarios", "usuarios", "crear"), 
+            ("usuarios_editar", "Editar usuarios existentes", "usuarios", "editar"),
+            ("usuarios_eliminar", "Eliminar/desactivar usuarios", "usuarios", "eliminar"),
+            ("repuestos_leer", "Ver repuestos", "repuestos", "leer"),
+            ("repuestos_crear", "Crear repuestos", "repuestos", "crear"),
+            ("repuestos_editar", "Editar repuestos", "repuestos", "editar"),
+            ("repuestos_eliminar", "Eliminar repuestos", "repuestos", "eliminar"),
+            ("maquinas_leer", "Ver máquinas", "maquinas", "leer"),
+            ("maquinas_crear", "Crear máquinas", "maquinas", "crear"),
+            ("maquinas_editar", "Editar máquinas", "maquinas", "editar"),
+            ("maquinas_eliminar", "Eliminar máquinas", "maquinas", "eliminar")
+        ]
+        
+        for nombre, descripcion, recurso, accion in permisos_basicos:
+            permiso_existente = db.query(Permisos).filter(Permisos.nombre == nombre).first()
+            if not permiso_existente:
+                nuevo_permiso = Permisos(
+                    nombre=nombre,
+                    descripcion=descripcion,
+                    recurso=recurso,
+                    accion=accion,
+                    activo=True
+                )
+                db.add(nuevo_permiso)
+        
+        db.flush()
+        
+        # Asignar todos los permisos al rol de administrador
+        todos_los_permisos = db.query(Permisos).all()
+        admin_role.permisos.clear()
+        for permiso in todos_los_permisos:
+            admin_role.permisos.append(permiso)
+        
         # Asignar todas las páginas al admin
         todas_las_paginas = db.query(Paginas).all()
         for pagina in todas_las_paginas:
@@ -521,17 +568,17 @@ def create_admin_user(engine):
         
         db.commit()
         
-        print("✅ Usuario administrador creado:")
+        print("Usuario administrador creado:")
         print("   Usuario: admin")
         print("   Contraseña: admin123")
         print(f"   Páginas asignadas: {len(todas_las_paginas)}")
-        print("   ⚠️  IMPORTANTE: Cambiar contraseña en primer login")
+        print("   ADVERTENCIA: IMPORTANTE: Cambiar contraseña en primer login")
         
         db.close()
         return True
         
     except SQLAlchemyError as e:
-        print(f"❌ Error creando usuario admin: {e}")
+        print(f"ERROR: Error creando usuario admin: {e}")
         if 'db' in locals():
             db.rollback()
             db.close()
@@ -542,10 +589,10 @@ def main():
     # Obtener URL de la base de datos
     database_url = os.getenv('DATABASE_URL')
     if not database_url:
-        print("❌ Variable DATABASE_URL no encontrada")
+        print("ERROR: Variable DATABASE_URL no encontrada")
         sys.exit(1)
     
-    print(f"🚀 Inicializando base de datos...")
+    print(f"Inicializando base de datos...")
     
     try:
         # Crear engine
@@ -575,11 +622,11 @@ def main():
         if not create_admin_user(engine):
             sys.exit(1)
         
-        print("🎉 Inicialización completada exitosamente")
-        print("📋 Sistema listo con páginas y usuario admin configurados")
+        print("Inicialización completada exitosamente")
+        print("Sistema listo con páginas y usuario admin configurados")
         
     except Exception as e:
-        print(f"❌ Error general: {e}")
+        print(f"ERROR: Error general: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":

@@ -1,4 +1,7 @@
-/_pycache/
+/app/__pycache__
+/__pycache__
 /venv/
+/migrate
 .env
 config_pgadmin.txt
+nul

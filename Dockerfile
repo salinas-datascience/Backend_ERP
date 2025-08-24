@@ -17,7 +17,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar el código de la aplicación
 COPY ./app .
-COPY init_user_system.py /app/init_user_system.py
 
 # Dar permisos al usuario fastapi
 RUN chown -R fastapi:fastapi /app
