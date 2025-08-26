@@ -1,1 +1,1 @@
-from . import crud_usuarios, crud_ordenes_compra
+from . import crud_usuarios, crud_ordenes_compra, crud_ordenes_trabajo

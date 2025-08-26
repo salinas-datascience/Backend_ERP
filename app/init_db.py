@@ -271,6 +271,82 @@ class Paginas(Base):
     
     usuarios = relationship("Usuarios", secondary=usuarios_paginas, back_populates="paginas_permitidas")
 
+
+class OrdenesTrabajoMantenimiento(Base):
+    """Modelo para órdenes de trabajo de mantenimiento."""
+    __tablename__ = 'ordenes_trabajo_mantenimiento'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    titulo = Column(String, nullable=False)
+    descripcion = Column(Text)
+    maquina_id = Column(Integer, ForeignKey('maquinas.id'), nullable=False)
+    usuario_asignado_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    usuario_creador_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    nivel_criticidad = Column(String, nullable=False)  # baja, media, alta, critica
+    estado = Column(String, default='pendiente')  # pendiente, en_proceso, completada, cancelada
+    fecha_programada = Column(TIMESTAMP, nullable=False)
+    fecha_creacion = Column(TIMESTAMP, default=func.now())
+    fecha_inicio = Column(TIMESTAMP, nullable=True)
+    fecha_finalizacion = Column(TIMESTAMP, nullable=True)
+    tiempo_estimado_horas = Column(Integer, nullable=True)
+    
+    maquina = relationship("Maquinas")
+    usuario_asignado = relationship("Usuarios", foreign_keys=[usuario_asignado_id])
+    usuario_creador = relationship("Usuarios", foreign_keys=[usuario_creador_id])
+    comentarios = relationship("ComentariosOT", back_populates="orden_trabajo", cascade="all, delete-orphan")
+    archivos = relationship("ArchivosOT", back_populates="orden_trabajo", cascade="all, delete-orphan")
+
+
+class ComentariosOT(Base):
+    """Modelo para comentarios en órdenes de trabajo."""
+    __tablename__ = 'comentarios_ot'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    orden_trabajo_id = Column(Integer, ForeignKey('ordenes_trabajo_mantenimiento.id'), nullable=False)
+    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    comentario = Column(Text, nullable=False)
+    fecha_creacion = Column(TIMESTAMP, default=func.now())
+    
+    orden_trabajo = relationship("OrdenesTrabajoMantenimiento", back_populates="comentarios")
+    usuario = relationship("Usuarios")
+    archivos = relationship("ArchivosComentarioOT", back_populates="comentario", cascade="all, delete-orphan")
+
+
+class ArchivosOT(Base):
+    """Modelo para archivos adjuntos en órdenes de trabajo."""
+    __tablename__ = 'archivos_ot'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    orden_trabajo_id = Column(Integer, ForeignKey('ordenes_trabajo_mantenimiento.id'), nullable=False)
+    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    nombre_archivo = Column(String, nullable=False)
+    nombre_archivo_sistema = Column(String, nullable=False)
+    ruta_archivo = Column(String, nullable=False)
+    tipo_mime = Column(String, nullable=False)
+    tamaño_bytes = Column(Integer, nullable=False)
+    fecha_creacion = Column(TIMESTAMP, default=func.now())
+    
+    orden_trabajo = relationship("OrdenesTrabajoMantenimiento", back_populates="archivos")
+    usuario = relationship("Usuarios")
+
+
+class ArchivosComentarioOT(Base):
+    """Modelo para archivos adjuntos en comentarios de órdenes de trabajo."""
+    __tablename__ = 'archivos_comentario_ot'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    comentario_id = Column(Integer, ForeignKey('comentarios_ot.id'), nullable=False)
+    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    nombre_archivo = Column(String, nullable=False)
+    nombre_archivo_sistema = Column(String, nullable=False)
+    ruta_archivo = Column(String, nullable=False)
+    tipo_mime = Column(String, nullable=False)
+    tamaño_bytes = Column(Integer, nullable=False)
+    fecha_creacion = Column(TIMESTAMP, default=func.now())
+    
+    comentario = relationship("ComentariosOT", back_populates="archivos")
+    usuario = relationship("Usuarios")
+
 def wait_for_db(engine, max_retries=30):
     """Espera a que la base de datos esté disponible"""
     for i in range(max_retries):
@@ -409,6 +485,77 @@ def migrate_database(engine):
         print(f"ERROR: Error ejecutando migraciones: {e}")
         return False
 
+def migrate_pages_database(engine):
+    """Migración específica para páginas faltantes"""
+    try:
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        db = SessionLocal()
+        
+        print("Ejecutando migración: agregar páginas faltantes")
+        
+        # Verificar páginas existentes
+        paginas_existentes = db.query(Paginas).all()
+        nombres_existentes = [p.nombre for p in paginas_existentes]
+        print(f"Páginas existentes encontradas: {len(nombres_existentes)}")
+        
+        # Páginas que deben existir
+        paginas_requeridas = [
+            {
+                "nombre": "ordenes_trabajo",
+                "ruta": "/ordenes-trabajo",
+                "titulo": "Generar OT", 
+                "descripcion": "Gestión y creación de órdenes de trabajo de mantenimiento",
+                "icono": "Wrench",
+                "orden": 8,
+                "activa": True,
+                "solo_admin": False
+            },
+            {
+                "nombre": "mis_ordenes_trabajo",
+                "ruta": "/mis-ordenes-trabajo",
+                "titulo": "OTs Asignadas",
+                "descripcion": "Órdenes de trabajo asignadas al usuario", 
+                "icono": "ClipboardList",
+                "orden": 9,
+                "activa": True,
+                "solo_admin": False
+            }
+        ]
+        
+        # Agregar páginas que no existen
+        paginas_agregadas = 0
+        for page_data in paginas_requeridas:
+            if page_data["nombre"] not in nombres_existentes:
+                nueva_pagina = Paginas(
+                    nombre=page_data["nombre"],
+                    ruta=page_data["ruta"],
+                    titulo=page_data["titulo"],
+                    descripcion=page_data["descripcion"],
+                    icono=page_data["icono"],
+                    orden=page_data["orden"],
+                    activa=page_data["activa"],
+                    solo_admin=page_data["solo_admin"]
+                )
+                db.add(nueva_pagina)
+                paginas_agregadas += 1
+                print(f"✓ Página '{page_data['titulo']}' agregada")
+        
+        if paginas_agregadas > 0:
+            db.commit()
+            print(f"✓ {paginas_agregadas} páginas agregadas exitosamente")
+        else:
+            print("✓ Todas las páginas requeridas ya existen")
+        
+        db.close()
+        return True
+        
+    except SQLAlchemyError as e:
+        print(f"ERROR: Error en migración de páginas: {e}")
+        if 'db' in locals():
+            db.rollback()
+            db.close()
+        return False
+
 def create_sample_data(engine):
     """Crear datos de ejemplo para el sistema"""
     try:
@@ -521,7 +668,7 @@ def create_system_pages(engine):
                 "ruta": "/repuestos",
                 "titulo": "Gestión de Repuestos",
                 "descripcion": "Administrar inventario de repuestos y componentes",
-                "icono": "Package",
+                "icono": "Warehouse",
                 "orden": 1,
                 "activa": True,
                 "solo_admin": False
@@ -608,22 +755,32 @@ def create_system_pages(engine):
                 "solo_admin": True
             },
             {
-                "nombre": "almacenamientos",
-                "ruta": "/almacenamientos",
-                "titulo": "Almacenamientos",
-                "descripcion": "Gestión de ubicaciones de almacenamiento",
-                "icono": "Warehouse",
-                "orden": 6,
-                "activa": True,
-                "solo_admin": False
-            },
-            {
                 "nombre": "ordenes_compra",
                 "ruta": "/ordenes-compra",
                 "titulo": "Órdenes de Compra",
                 "descripcion": "Gestión de pedidos de repuestos y seguimiento de órdenes",
                 "icono": "ShoppingCart",
                 "orden": 7,
+                "activa": True,
+                "solo_admin": False
+            },
+            {
+                "nombre": "ordenes_trabajo",
+                "ruta": "/ordenes-trabajo",
+                "titulo": "Generar OT",
+                "descripcion": "Gestión y creación de órdenes de trabajo de mantenimiento",
+                "icono": "Wrench",
+                "orden": 8,
+                "activa": True,
+                "solo_admin": False
+            },
+            {
+                "nombre": "mis_ordenes_trabajo",
+                "ruta": "/mis-ordenes-trabajo",
+                "titulo": "OTs Asignadas",
+                "descripcion": "Órdenes de trabajo asignadas al usuario",
+                "icono": "ClipboardList",
+                "orden": 9,
                 "activa": True,
                 "solo_admin": False
             }
@@ -725,7 +882,13 @@ def create_admin_user(engine):
             ("ordenes_crear", "Crear órdenes de compra", "ordenes_compra", "crear"),
             ("ordenes_editar", "Editar órdenes de compra", "ordenes_compra", "editar"),
             ("ordenes_eliminar", "Eliminar órdenes de compra", "ordenes_compra", "eliminar"),
-            ("ordenes_confirmar", "Confirmar llegada de repuestos", "ordenes_compra", "confirmar")
+            ("ordenes_confirmar", "Confirmar llegada de repuestos", "ordenes_compra", "confirmar"),
+            ("ot_leer", "Ver órdenes de trabajo", "ordenes_trabajo", "leer"),
+            ("ot_crear", "Crear órdenes de trabajo", "ordenes_trabajo", "crear"),
+            ("ot_editar", "Editar órdenes de trabajo", "ordenes_trabajo", "editar"),
+            ("ot_eliminar", "Eliminar órdenes de trabajo", "ordenes_trabajo", "eliminar"),
+            ("ot_asignar", "Asignar órdenes de trabajo", "ordenes_trabajo", "asignar"),
+            ("ot_comentar", "Comentar órdenes de trabajo", "ordenes_trabajo", "comentar")
         ]
         
         for nombre, descripcion, recurso, accion in permisos_basicos:
@@ -799,6 +962,10 @@ def main():
         
         # Ejecutar migraciones de base de datos
         if not migrate_database(engine):
+            sys.exit(1)
+        
+        # Ejecutar migración de páginas
+        if not migrate_pages_database(engine):
             sys.exit(1)
         
         # Crear datos de ejemplo

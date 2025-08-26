@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic_settings import BaseSettings
 
-from routers import proveedores, modelos_maquinas, maquinas, repuestos, historial, almacenamientos, auth, usuarios, admin, ordenes_compra
+from routers import proveedores, modelos_maquinas, maquinas, repuestos, historial, almacenamientos, auth, usuarios, admin, ordenes_compra, ordenes_trabajo
 
 
 class Settings(BaseSettings):
@@ -24,7 +24,14 @@ app = FastAPI(
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # En producción, especificar dominios específicos
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:5174", 
+        "http://localhost:5175",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:5175"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -41,6 +48,7 @@ app.include_router(repuestos.router)
 app.include_router(historial.router)
 app.include_router(almacenamientos.router)
 app.include_router(ordenes_compra.router)
+app.include_router(ordenes_trabajo.router, prefix="/api/ordenes-trabajo", tags=["ordenes-trabajo"])
 
 
 @app.get("/")

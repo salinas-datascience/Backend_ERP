@@ -425,3 +425,174 @@ class EstadosOrden:
 # Para actualización masiva de llegada de repuestos
 class ConfirmarLlegadaRequest(BaseModel):
     items_recibidos: List[dict]  # [{"item_id": int, "cantidad_recibida": int}]
+
+
+# === ESQUEMAS PARA ÓRDENES DE TRABAJO DE MANTENIMIENTO ===
+
+# Esquemas base
+class OrdenTrabajoBase(BaseModel):
+    titulo: str
+    descripcion: Optional[str] = None
+    maquina_id: int
+    usuario_asignado_id: int
+    nivel_criticidad: str  # baja, media, alta, critica
+    fecha_programada: datetime
+    tiempo_estimado_horas: Optional[int] = None
+
+
+class OrdenTrabajoCreate(OrdenTrabajoBase):
+    pass
+
+
+class OrdenTrabajoUpdate(BaseModel):
+    titulo: Optional[str] = None
+    descripcion: Optional[str] = None
+    maquina_id: Optional[int] = None
+    usuario_asignado_id: Optional[int] = None
+    nivel_criticidad: Optional[str] = None
+    fecha_programada: Optional[datetime] = None
+    tiempo_estimado_horas: Optional[int] = None
+    estado: Optional[str] = None  # pendiente, en_proceso, completada, cancelada
+
+
+# Esquemas de respuesta para comentarios
+class ComentarioOTBase(BaseModel):
+    comentario: str
+
+
+class ComentarioOTCreate(ComentarioOTBase):
+    orden_trabajo_id: int
+
+
+class UsuarioBasico(BaseModel):
+    id: int
+    username: str
+    nombre_completo: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ComentarioOTResponse(ComentarioOTBase):
+    id: int
+    orden_trabajo_id: int
+    fecha_creacion: datetime
+    usuario: UsuarioBasico
+    archivos: List['ArchivoComentarioOTResponse'] = []
+
+    class Config:
+        from_attributes = True
+
+
+# Esquemas para archivos de órdenes de trabajo
+class ArchivoOTBase(BaseModel):
+    nombre_archivo: str
+    tipo_mime: str
+    tamaño_bytes: int
+
+
+class ArchivoOTResponse(ArchivoOTBase):
+    id: int
+    orden_trabajo_id: int
+    nombre_archivo_sistema: str
+    ruta_archivo: str
+    fecha_creacion: datetime
+    usuario: UsuarioBasico
+
+    class Config:
+        from_attributes = True
+
+
+# Esquemas para archivos de comentarios
+class ArchivoComentarioOTBase(BaseModel):
+    nombre_archivo: str
+    tipo_mime: str
+    tamaño_bytes: int
+
+
+class ArchivoComentarioOTResponse(ArchivoComentarioOTBase):
+    id: int
+    comentario_id: int
+    nombre_archivo_sistema: str
+    ruta_archivo: str
+    fecha_creacion: datetime
+    usuario: UsuarioBasico
+
+    class Config:
+        from_attributes = True
+
+
+# Esquemas de respuesta para órdenes de trabajo
+class MaquinaBasica(BaseModel):
+    id: int
+    numero_serie: str
+    alias: Optional[str] = None
+    ubicacion: Optional[str] = None
+    modelo: Optional[ModeloMaquinaResponse] = None
+
+    class Config:
+        from_attributes = True
+
+
+class OrdenTrabajoResponse(OrdenTrabajoBase):
+    id: int
+    estado: str
+    fecha_creacion: datetime
+    fecha_inicio: Optional[datetime] = None
+    fecha_finalizacion: Optional[datetime] = None
+    
+    # Relaciones
+    maquina: MaquinaBasica
+    usuario_asignado: UsuarioBasico
+    usuario_creador: UsuarioBasico
+    comentarios: List[ComentarioOTResponse] = []
+    archivos: List[ArchivoOTResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
+class OrdenTrabajoListResponse(BaseModel):
+    id: int
+    titulo: str
+    estado: str
+    nivel_criticidad: str
+    fecha_programada: datetime
+    fecha_creacion: datetime
+    maquina_numero_serie: str
+    maquina_alias: Optional[str] = None
+    usuario_asignado_nombre: str
+    usuario_creador_nombre: str
+
+    class Config:
+        from_attributes = True
+
+
+# Estados válidos para órdenes de trabajo
+class EstadosOrdenTrabajo:
+    PENDIENTE = "pendiente"
+    EN_PROCESO = "en_proceso"
+    COMPLETADA = "completada"
+    CANCELADA = "cancelada"
+
+
+# Niveles de criticidad válidos
+class NivelesCriticidad:
+    BAJA = "baja"
+    MEDIA = "media"
+    ALTA = "alta"
+    CRITICA = "critica"
+
+
+# Esquema para estadísticas
+class EstadisticasOT(BaseModel):
+    total_pendiente: int
+    total_en_proceso: int
+    total_completada: int
+    total_cancelada: int
+    total_baja: int
+    total_media: int
+    total_alta: int
+    total_critica: int
+    total_general: int
+    total_vencidas: int

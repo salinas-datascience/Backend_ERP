@@ -305,3 +305,99 @@ class DocumentosOrden(Base):
     # Relaciones
     orden = relationship("OrdenesCompra", back_populates="documentos")
     usuario_subida = relationship("Usuarios")
+
+
+class OrdenesTrabajoMantenimiento(Base):
+    """Modelo para órdenes de trabajo de mantenimiento.
+    
+    Gestiona las tareas de mantenimiento asignadas a técnicos para máquinas específicas,
+    incluyendo fecha programada, nivel de criticidad y seguimiento del estado.
+    """
+    __tablename__ = 'ordenes_trabajo_mantenimiento'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    titulo = Column(String, nullable=False)
+    descripcion = Column(Text)
+    maquina_id = Column(Integer, ForeignKey('maquinas.id'), nullable=False)
+    usuario_asignado_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    usuario_creador_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    nivel_criticidad = Column(String, nullable=False)  # baja, media, alta, critica
+    estado = Column(String, default='pendiente')  # pendiente, en_proceso, completada, cancelada
+    fecha_programada = Column(TIMESTAMP, nullable=False)
+    fecha_creacion = Column(TIMESTAMP, default=func.now())
+    fecha_inicio = Column(TIMESTAMP, nullable=True)
+    fecha_finalizacion = Column(TIMESTAMP, nullable=True)
+    tiempo_estimado_horas = Column(Integer, nullable=True)
+    
+    # Relaciones
+    maquina = relationship("Maquinas")
+    usuario_asignado = relationship("Usuarios", foreign_keys=[usuario_asignado_id])
+    usuario_creador = relationship("Usuarios", foreign_keys=[usuario_creador_id])
+    comentarios = relationship("ComentariosOT", back_populates="orden_trabajo", cascade="all, delete-orphan")
+    archivos = relationship("ArchivosOT", back_populates="orden_trabajo", cascade="all, delete-orphan")
+
+
+class ComentariosOT(Base):
+    """Modelo para comentarios en órdenes de trabajo.
+    
+    Permite a los técnicos agregar comentarios y observaciones durante
+    la ejecución de las tareas de mantenimiento.
+    """
+    __tablename__ = 'comentarios_ot'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    orden_trabajo_id = Column(Integer, ForeignKey('ordenes_trabajo_mantenimiento.id'), nullable=False)
+    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    comentario = Column(Text, nullable=False)
+    fecha_creacion = Column(TIMESTAMP, default=func.now())
+    
+    # Relaciones
+    orden_trabajo = relationship("OrdenesTrabajoMantenimiento", back_populates="comentarios")
+    usuario = relationship("Usuarios")
+    archivos = relationship("ArchivosComentarioOT", back_populates="comentario", cascade="all, delete-orphan")
+
+
+class ArchivosOT(Base):
+    """Modelo para archivos adjuntos en órdenes de trabajo.
+    
+    Almacena archivos adjuntos asociados directamente a las órdenes de trabajo,
+    como planos, manuales, imágenes de referencia, etc.
+    """
+    __tablename__ = 'archivos_ot'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    orden_trabajo_id = Column(Integer, ForeignKey('ordenes_trabajo_mantenimiento.id'), nullable=False)
+    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    nombre_archivo = Column(String, nullable=False)  # Nombre original del archivo
+    nombre_archivo_sistema = Column(String, nullable=False)  # Nombre único en el sistema
+    ruta_archivo = Column(String, nullable=False)  # Ruta completa del archivo
+    tipo_mime = Column(String, nullable=False)  # image/jpeg, application/pdf, etc.
+    tamaño_bytes = Column(Integer, nullable=False)
+    fecha_creacion = Column(TIMESTAMP, default=func.now())
+    
+    # Relaciones
+    orden_trabajo = relationship("OrdenesTrabajoMantenimiento", back_populates="archivos")
+    usuario = relationship("Usuarios")
+
+
+class ArchivosComentarioOT(Base):
+    """Modelo para archivos adjuntos en comentarios de órdenes de trabajo.
+    
+    Almacena archivos adjuntos asociados a comentarios específicos,
+    como fotos del progreso, documentos de evidencia, etc.
+    """
+    __tablename__ = 'archivos_comentario_ot'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    comentario_id = Column(Integer, ForeignKey('comentarios_ot.id'), nullable=False)
+    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    nombre_archivo = Column(String, nullable=False)  # Nombre original del archivo
+    nombre_archivo_sistema = Column(String, nullable=False)  # Nombre único en el sistema
+    ruta_archivo = Column(String, nullable=False)  # Ruta completa del archivo
+    tipo_mime = Column(String, nullable=False)  # image/jpeg, application/pdf, etc.
+    tamaño_bytes = Column(Integer, nullable=False)
+    fecha_creacion = Column(TIMESTAMP, default=func.now())
+    
+    # Relaciones
+    comentario = relationship("ComentariosOT", back_populates="archivos")
+    usuario = relationship("Usuarios")
