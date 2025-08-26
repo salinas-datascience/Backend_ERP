@@ -282,6 +282,7 @@ class OrdenesTrabajoMantenimiento(Base):
     maquina_id = Column(Integer, ForeignKey('maquinas.id'), nullable=False)
     usuario_asignado_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
     usuario_creador_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    tipo_mantenimiento = Column(String, nullable=False, default='correctivo')  # preventivo, predictivo, correctivo
     nivel_criticidad = Column(String, nullable=False)  # baja, media, alta, critica
     estado = Column(String, default='pendiente')  # pendiente, en_proceso, completada, cancelada
     fecha_programada = Column(TIMESTAMP, nullable=False)
@@ -478,6 +479,30 @@ def migrate_database(engine):
             else:
                 print("✓ Columna 'descripcion_aduana' ya existe en repuestos")
             
+            # Migración 3: Agregar campo 'tipo_mantenimiento' a OrdenesTrabajoMantenimiento
+            print("Ejecutando migración: agregar campo tipo_mantenimiento a ordenes_trabajo_mantenimiento")
+            
+            # Verificar si la columna ya existe
+            result = conn.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'ordenes_trabajo_mantenimiento' 
+                AND column_name = 'tipo_mantenimiento'
+            """))
+            
+            ot_columns = [row[0] for row in result.fetchall()]
+            
+            if 'tipo_mantenimiento' not in ot_columns:
+                print("Agregando columna 'tipo_mantenimiento' a la tabla ordenes_trabajo_mantenimiento...")
+                conn.execute(text("""
+                    ALTER TABLE ordenes_trabajo_mantenimiento 
+                    ADD COLUMN tipo_mantenimiento VARCHAR(20) NOT NULL DEFAULT 'correctivo'
+                """))
+                conn.commit()
+                print("✓ Columna 'tipo_mantenimiento' agregada a ordenes_trabajo_mantenimiento")
+            else:
+                print("✓ Columna 'tipo_mantenimiento' ya existe en ordenes_trabajo_mantenimiento")
+            
         print("Migraciones completadas exitosamente")
         return True
         
@@ -517,6 +542,16 @@ def migrate_pages_database(engine):
                 "descripcion": "Órdenes de trabajo asignadas al usuario", 
                 "icono": "ClipboardList",
                 "orden": 9,
+                "activa": True,
+                "solo_admin": False
+            },
+            {
+                "nombre": "dashboard_metricas",
+                "ruta": "/dashboard-metricas",
+                "titulo": "Dashboard MTBF/MTTR",
+                "descripcion": "Dashboard con métricas de mantenimiento MTBF y MTTR",
+                "icono": "BarChart3",
+                "orden": 6,
                 "activa": True,
                 "solo_admin": False
             }
@@ -781,6 +816,16 @@ def create_system_pages(engine):
                 "descripcion": "Órdenes de trabajo asignadas al usuario",
                 "icono": "ClipboardList",
                 "orden": 9,
+                "activa": True,
+                "solo_admin": False
+            },
+            {
+                "nombre": "dashboard_metricas",
+                "ruta": "/dashboard-metricas",
+                "titulo": "Dashboard MTBF/MTTR",
+                "descripcion": "Dashboard con métricas de mantenimiento MTBF y MTTR",
+                "icono": "BarChart3",
+                "orden": 6,
                 "activa": True,
                 "solo_admin": False
             }

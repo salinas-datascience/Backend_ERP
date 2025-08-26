@@ -321,6 +321,7 @@ class OrdenesTrabajoMantenimiento(Base):
     maquina_id = Column(Integer, ForeignKey('maquinas.id'), nullable=False)
     usuario_asignado_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
     usuario_creador_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    tipo_mantenimiento = Column(String, nullable=False, default='correctivo')  # preventivo, predictivo, correctivo
     nivel_criticidad = Column(String, nullable=False)  # baja, media, alta, critica
     estado = Column(String, default='pendiente')  # pendiente, en_proceso, completada, cancelada
     fecha_programada = Column(TIMESTAMP, nullable=False)

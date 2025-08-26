@@ -37,6 +37,7 @@ class CRUDOrdenTrabajo:
         search: Optional[str] = None,
         estado: Optional[str] = None,
         nivel_criticidad: Optional[str] = None,
+        tipo_mantenimiento: Optional[str] = None,
         usuario_asignado_id: Optional[int] = None,
         maquina_id: Optional[int] = None,
         fecha_inicio: Optional[date] = None,
@@ -73,6 +74,10 @@ class CRUDOrdenTrabajo:
         # Filtro por nivel de criticidad
         if nivel_criticidad:
             query = query.filter(OrdenesTrabajoMantenimiento.nivel_criticidad == nivel_criticidad)
+        
+        # Filtro por tipo de mantenimiento
+        if tipo_mantenimiento:
+            query = query.filter(OrdenesTrabajoMantenimiento.tipo_mantenimiento == tipo_mantenimiento)
         
         # Filtro por usuario asignado
         if usuario_asignado_id:

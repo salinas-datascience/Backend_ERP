@@ -435,6 +435,7 @@ class OrdenTrabajoBase(BaseModel):
     descripcion: Optional[str] = None
     maquina_id: int
     usuario_asignado_id: int
+    tipo_mantenimiento: str  # preventivo, predictivo, correctivo
     nivel_criticidad: str  # baja, media, alta, critica
     fecha_programada: datetime
     tiempo_estimado_horas: Optional[int] = None
@@ -449,6 +450,7 @@ class OrdenTrabajoUpdate(BaseModel):
     descripcion: Optional[str] = None
     maquina_id: Optional[int] = None
     usuario_asignado_id: Optional[int] = None
+    tipo_mantenimiento: Optional[str] = None  # preventivo, predictivo, correctivo
     nivel_criticidad: Optional[str] = None
     fecha_programada: Optional[datetime] = None
     tiempo_estimado_horas: Optional[int] = None
@@ -556,6 +558,7 @@ class OrdenTrabajoListResponse(BaseModel):
     id: int
     titulo: str
     estado: str
+    tipo_mantenimiento: str
     nivel_criticidad: str
     fecha_programada: datetime
     fecha_creacion: datetime
@@ -582,6 +585,13 @@ class NivelesCriticidad:
     MEDIA = "media"
     ALTA = "alta"
     CRITICA = "critica"
+
+
+# Tipos de mantenimiento válidos
+class TiposMantenimiento:
+    PREVENTIVO = "preventivo"
+    PREDICTIVO = "predictivo"
+    CORRECTIVO = "correctivo"
 
 
 # Esquema para estadísticas
