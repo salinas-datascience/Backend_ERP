@@ -114,6 +114,8 @@ class RepuestoBase(BaseModel):
     cantidad: int = 0
     cantidad_minima: Optional[int] = None  # Cantidad mínima personalizada para alertas
     proveedor_id: Optional[int] = None
+    tipo: Optional[str] = None  # insumo, repuesto, consumible (opcional)
+    descripcion_aduana: Optional[str] = None  # Descripción para aduana (opcional)
 
 class RepuestoCreate(RepuestoBase):
     pass
@@ -127,6 +129,8 @@ class RepuestoUpdate(BaseModel):
     cantidad: Optional[int] = None
     cantidad_minima: Optional[int] = None
     proveedor_id: Optional[int] = None
+    tipo: Optional[str] = None
+    descripcion_aduana: Optional[str] = None
 
 class RepuestoResponse(RepuestoBase):
     id: int
@@ -315,3 +319,109 @@ class LoginResponse(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+
+
+# === ÓRDENES DE COMPRA ===
+
+class ItemOrdenBase(BaseModel):
+    repuesto_id: Optional[int] = None  # Opcional para items manuales
+    cantidad_pedida: int
+    descripcion_aduana: Optional[str] = None
+    precio_unitario: Optional[str] = None
+    # Campos para items manuales
+    es_item_manual: bool = False
+    nombre_manual: Optional[str] = None
+    codigo_manual: Optional[str] = None
+    detalle_manual: Optional[str] = None
+    cantidad_minima_manual: Optional[int] = None
+
+class ItemOrdenCreate(ItemOrdenBase):
+    pass
+
+class ItemOrdenUpdate(BaseModel):
+    repuesto_id: Optional[int] = None  # Permitir cambiar el repuesto
+    cantidad_pedida: Optional[int] = None
+    descripcion_aduana: Optional[str] = None
+    precio_unitario: Optional[str] = None
+    cantidad_recibida: Optional[int] = None
+    # Campos manuales (solo para actualizar)
+    nombre_manual: Optional[str] = None
+    codigo_manual: Optional[str] = None
+    detalle_manual: Optional[str] = None
+    cantidad_minima_manual: Optional[int] = None
+
+class ItemOrdenResponse(ItemOrdenBase):
+    id: int
+    orden_id: int
+    cantidad_recibida: int
+    fecha_creacion: datetime
+    repuesto: Optional[RepuestoResponse] = None
+
+    class Config:
+        from_attributes = True
+
+class DocumentoOrdenBase(BaseModel):
+    nombre_archivo: str
+    tipo_archivo: str
+    tamaño_archivo: int
+
+class DocumentoOrdenResponse(DocumentoOrdenBase):
+    id: int
+    orden_id: int
+    ruta_archivo: str
+    fecha_subida: datetime
+    usuario_subida_id: int
+
+    class Config:
+        from_attributes = True
+
+class OrdenCompraBase(BaseModel):
+    proveedor_id: int
+    observaciones: Optional[str] = None
+
+class OrdenCompraCreate(OrdenCompraBase):
+    items: List[ItemOrdenCreate] = []
+
+class OrdenCompraUpdate(BaseModel):
+    proveedor_id: Optional[int] = None
+    numero_requisicion: Optional[str] = None
+    legajo: Optional[str] = None
+    estado: Optional[str] = None
+    observaciones: Optional[str] = None
+
+class OrdenCompraResponse(OrdenCompraBase):
+    id: int
+    numero_requisicion: Optional[str] = None
+    legajo: Optional[str] = None
+    estado: str
+    fecha_creacion: datetime
+    fecha_actualizacion: datetime
+    usuario_creador_id: int
+    proveedor: Optional[ProveedorResponse] = None
+    items: List[ItemOrdenResponse] = []
+    documentos: List[DocumentoOrdenResponse] = []
+
+    class Config:
+        from_attributes = True
+
+class OrdenCompraListResponse(BaseModel):
+    id: int
+    numero_compra: Optional[str] = None
+    proveedor_nombre: str
+    estado: str
+    fecha_creacion: datetime
+    total_items: int
+
+    class Config:
+        from_attributes = True
+
+# Estados válidos para órdenes de compra
+class EstadosOrden:
+    BORRADOR = "borrador"
+    COTIZADO = "cotizado"
+    CONFIRMADO = "confirmado" 
+    COMPLETADO = "completado"
+
+# Para actualización masiva de llegada de repuestos
+class ConfirmarLlegadaRequest(BaseModel):
+    items_recibidos: List[dict]  # [{"item_id": int, "cantidad_recibida": int}]

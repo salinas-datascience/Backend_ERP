@@ -124,8 +124,9 @@ class Proveedores(Base):
     telefono = Column(String)
     email = Column(String)
     
-    # Relación con repuestos
+    # Relaciones
     repuestos = relationship("Repuestos", back_populates="proveedor")
+    ordenes_compra = relationship("OrdenesCompra", back_populates="proveedor")
 
 
 class ModelosMaquinas(Base):
@@ -200,11 +201,14 @@ class Repuestos(Base):
     cantidad = Column(Integer, default=0)
     cantidad_minima = Column(Integer, nullable=True)  # Cantidad mínima personalizada para alertas
     proveedor_id = Column(Integer, ForeignKey('proveedores.id'))
+    tipo = Column(String, nullable=True)  # insumo, repuesto, consumible (opcional)
+    descripcion_aduana = Column(Text, nullable=True)  # Descripción para aduana (opcional)
     
     # Relaciones
     proveedor = relationship("Proveedores", back_populates="repuestos")
     almacenamiento = relationship("Almacenamientos", back_populates="repuestos")
     historial_repuestos = relationship("HistorialRepuestos", back_populates="repuesto")
+    items_orden = relationship("ItemsOrdenCompra", back_populates="repuesto")
 
 
 class HistorialRepuestos(Base):
@@ -225,3 +229,79 @@ class HistorialRepuestos(Base):
     # Relaciones
     repuesto = relationship("Repuestos", back_populates="historial_repuestos")
     maquina = relationship("Maquinas", back_populates="historial_repuestos")
+
+
+class OrdenesCompra(Base):
+    """Modelo para órdenes de compra de repuestos.
+    
+    Gestiona el ciclo completo de pedidos de repuestos desde la creación
+    hasta la recepción y almacenamiento en inventario.
+    """
+    __tablename__ = 'ordenes_compra'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    numero_requisicion = Column(String, unique=True, nullable=True, index=True)
+    proveedor_id = Column(Integer, ForeignKey('proveedores.id'), nullable=False)
+    legajo = Column(String, nullable=True)
+    estado = Column(String, default='borrador')  # borrador, cotizado, confirmado, completado
+    fecha_creacion = Column(TIMESTAMP, default=func.now())
+    fecha_actualizacion = Column(TIMESTAMP, default=func.now(), onupdate=func.now())
+    observaciones = Column(Text)
+    usuario_creador_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    
+    # Relaciones
+    proveedor = relationship("Proveedores", back_populates="ordenes_compra")
+    usuario_creador = relationship("Usuarios")
+    items = relationship("ItemsOrdenCompra", back_populates="orden", cascade="all, delete-orphan")
+    documentos = relationship("DocumentosOrden", back_populates="orden", cascade="all, delete-orphan")
+
+
+class ItemsOrdenCompra(Base):
+    """Modelo para items individuales dentro de una orden de compra.
+    
+    Cada item puede ser un repuesto existente o un item manual (temporal)
+    que se convertirá en repuesto cuando llegue la orden.
+    """
+    __tablename__ = 'items_orden_compra'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    orden_id = Column(Integer, ForeignKey('ordenes_compra.id'), nullable=False)
+    repuesto_id = Column(Integer, ForeignKey('repuestos.id'), nullable=True)  # Opcional para items manuales
+    cantidad_pedida = Column(Integer, nullable=False)
+    cantidad_recibida = Column(Integer, default=0)
+    descripcion_aduana = Column(Text, nullable=True)
+    precio_unitario = Column(String, nullable=True)
+    fecha_creacion = Column(TIMESTAMP, default=func.now())
+    
+    # Campos para items manuales
+    es_item_manual = Column(Boolean, default=False, nullable=False)
+    nombre_manual = Column(String, nullable=True)  # Solo para items manuales
+    codigo_manual = Column(String, nullable=True)  # Solo para items manuales  
+    detalle_manual = Column(Text, nullable=True)   # Solo para items manuales
+    cantidad_minima_manual = Column(Integer, nullable=True)  # Solo para items manuales
+    
+    # Relaciones
+    orden = relationship("OrdenesCompra", back_populates="items")
+    repuesto = relationship("Repuestos", back_populates="items_orden")
+
+
+class DocumentosOrden(Base):
+    """Modelo para documentos adjuntos a órdenes de compra.
+    
+    Almacena información de archivos PDF, imágenes y otros documentos
+    relacionados con las órdenes de compra.
+    """
+    __tablename__ = 'documentos_orden'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    orden_id = Column(Integer, ForeignKey('ordenes_compra.id'), nullable=False)
+    nombre_archivo = Column(String, nullable=False)
+    ruta_archivo = Column(String, nullable=False)
+    tipo_archivo = Column(String, nullable=False)
+    tamaño_archivo = Column(Integer, nullable=False)
+    fecha_subida = Column(TIMESTAMP, default=func.now())
+    usuario_subida_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    
+    # Relaciones
+    orden = relationship("OrdenesCompra", back_populates="documentos")
+    usuario_subida = relationship("Usuarios")

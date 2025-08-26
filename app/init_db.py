@@ -28,6 +28,7 @@ class Proveedores(Base):
     email = Column(String)
     
     repuestos = relationship("Repuestos", back_populates="proveedor")
+    ordenes_compra = relationship("OrdenesCompra", back_populates="proveedor")
 
 class ModelosMaquinas(Base):
     """Modelo para los diferentes tipos de máquinas SMT.
@@ -95,10 +96,13 @@ class Repuestos(Base):
     cantidad = Column(Integer, default=0)
     cantidad_minima = Column(Integer)
     proveedor_id = Column(Integer, ForeignKey('proveedores.id'))
+    tipo = Column(String, nullable=True)  # insumo, repuesto, consumible (opcional)
+    descripcion_aduana = Column(Text, nullable=True)  # Descripción para aduana (opcional)
     
     proveedor = relationship("Proveedores", back_populates="repuestos")
     almacenamiento = relationship("Almacenamientos", back_populates="repuestos")
     historial_repuestos = relationship("HistorialRepuestos", back_populates="repuesto")
+    items_orden = relationship("ItemsOrdenCompra", back_populates="repuesto")
 
 class HistorialRepuestos(Base):
     """Modelo para el historial de uso de repuestos.
@@ -117,6 +121,76 @@ class HistorialRepuestos(Base):
     
     repuesto = relationship("Repuestos", back_populates="historial_repuestos")
     maquina = relationship("Maquinas", back_populates="historial_repuestos")
+
+class OrdenesCompra(Base):
+    """Modelo para órdenes de compra de repuestos.
+    
+    Gestiona el ciclo completo de pedidos de repuestos desde la creación
+    hasta la recepción y almacenamiento en inventario.
+    """
+    __tablename__ = 'ordenes_compra'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    numero_requisicion = Column(String, unique=True, nullable=True)
+    proveedor_id = Column(Integer, ForeignKey('proveedores.id'), nullable=False)
+    legajo = Column(String, nullable=True)
+    estado = Column(String, default='borrador')  # borrador, cotizado, confirmado, completado
+    fecha_creacion = Column(TIMESTAMP, default=func.now())
+    fecha_actualizacion = Column(TIMESTAMP, default=func.now(), onupdate=func.now())
+    observaciones = Column(Text)
+    usuario_creador_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    
+    proveedor = relationship("Proveedores", back_populates="ordenes_compra")
+    usuario_creador = relationship("Usuarios")
+    items = relationship("ItemsOrdenCompra", back_populates="orden", cascade="all, delete-orphan")
+    documentos = relationship("DocumentosOrden", back_populates="orden", cascade="all, delete-orphan")
+
+class ItemsOrdenCompra(Base):
+    """Modelo para items individuales dentro de una orden de compra.
+    
+    Cada item puede ser un repuesto existente o un item manual (temporal)
+    que se convertirá en repuesto cuando llegue la orden.
+    """
+    __tablename__ = 'items_orden_compra'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    orden_id = Column(Integer, ForeignKey('ordenes_compra.id'), nullable=False)
+    repuesto_id = Column(Integer, ForeignKey('repuestos.id'), nullable=True)  # Opcional para items manuales
+    cantidad_pedida = Column(Integer, nullable=False)
+    cantidad_recibida = Column(Integer, default=0)
+    descripcion_aduana = Column(Text, nullable=True)
+    precio_unitario = Column(String, nullable=True)
+    fecha_creacion = Column(TIMESTAMP, default=func.now())
+    
+    # Campos para items manuales
+    es_item_manual = Column(Boolean, default=False, nullable=False)
+    nombre_manual = Column(String, nullable=True)  # Solo para items manuales
+    codigo_manual = Column(String, nullable=True)  # Solo para items manuales  
+    detalle_manual = Column(Text, nullable=True)   # Solo para items manuales
+    cantidad_minima_manual = Column(Integer, nullable=True)  # Solo para items manuales
+    
+    orden = relationship("OrdenesCompra", back_populates="items")
+    repuesto = relationship("Repuestos", back_populates="items_orden")
+
+class DocumentosOrden(Base):
+    """Modelo para documentos adjuntos a órdenes de compra.
+    
+    Almacena información de archivos PDF, imágenes y otros documentos
+    relacionados con las órdenes de compra.
+    """
+    __tablename__ = 'documentos_orden'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    orden_id = Column(Integer, ForeignKey('ordenes_compra.id'), nullable=False)
+    nombre_archivo = Column(String, nullable=False)
+    ruta_archivo = Column(String, nullable=False)
+    tipo_archivo = Column(String, nullable=False)
+    tamaño_archivo = Column(Integer, nullable=False)
+    fecha_subida = Column(TIMESTAMP, default=func.now())
+    usuario_subida_id = Column(Integer, ForeignKey('usuarios.id'), nullable=False)
+    
+    orden = relationship("OrdenesCompra", back_populates="documentos")
+    usuario_subida = relationship("Usuarios")
 
 # Tablas de asociación para el sistema de usuarios
 roles_permisos = Table(
@@ -235,6 +309,104 @@ def create_tables(engine):
         return True
     except SQLAlchemyError as e:
         print(f"ERROR: Error creando tablas: {e}")
+        return False
+
+def migrate_database(engine):
+    """Ejecutar migraciones de base de datos"""
+    try:
+        with engine.connect() as conn:
+            # Migración 1: Cambiar numero_compra a numero_requisicion
+            print("Ejecutando migración: numero_compra -> numero_requisicion")
+            
+            # Verificar si la columna numero_compra existe y numero_requisicion no
+            result = conn.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'ordenes_compra' 
+                AND column_name IN ('numero_compra', 'numero_requisicion')
+            """))
+            
+            columns = [row[0] for row in result.fetchall()]
+            
+            if 'numero_compra' in columns and 'numero_requisicion' not in columns:
+                print("Renombrando columna numero_compra a numero_requisicion...")
+                conn.execute(text("""
+                    ALTER TABLE ordenes_compra 
+                    RENAME COLUMN numero_compra TO numero_requisicion
+                """))
+                conn.commit()
+                print("✓ Migración completada: numero_compra -> numero_requisicion")
+            elif 'numero_requisicion' in columns:
+                print("✓ Columna numero_requisicion ya existe")
+            else:
+                print("Creando columna numero_requisicion...")
+                conn.execute(text("""
+                    ALTER TABLE ordenes_compra 
+                    ADD COLUMN numero_requisicion VARCHAR(255) UNIQUE
+                """))
+                conn.commit()
+                print("✓ Columna numero_requisicion creada")
+            
+            # Verificar si necesitamos migrar datos de numero_compra a numero_requisicion
+            if 'numero_compra' in columns and 'numero_requisicion' in columns:
+                print("Migrando datos de numero_compra a numero_requisicion...")
+                conn.execute(text("""
+                    UPDATE ordenes_compra 
+                    SET numero_requisicion = numero_compra 
+                    WHERE numero_compra IS NOT NULL 
+                    AND numero_requisicion IS NULL
+                """))
+                conn.commit()
+                print("✓ Datos migrados exitosamente")
+                
+                # Eliminar la columna antigua
+                print("Eliminando columna numero_compra...")
+                conn.execute(text("ALTER TABLE ordenes_compra DROP COLUMN numero_compra"))
+                conn.commit()
+                print("✓ Columna numero_compra eliminada")
+            
+            # Migración 2: Agregar campos 'tipo' y 'descripcion_aduana' a la tabla repuestos
+            print("Ejecutando migración: agregar campos tipo y descripcion_aduana a repuestos")
+            
+            # Verificar si las columnas ya existen
+            result = conn.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'repuestos' 
+                AND column_name IN ('tipo', 'descripcion_aduana')
+            """))
+            
+            repuestos_columns = [row[0] for row in result.fetchall()]
+            
+            # Agregar columna 'tipo' si no existe (opcional)
+            if 'tipo' not in repuestos_columns:
+                print("Agregando columna 'tipo' a la tabla repuestos...")
+                conn.execute(text("""
+                    ALTER TABLE repuestos 
+                    ADD COLUMN tipo VARCHAR(50)
+                """))
+                conn.commit()
+                print("✓ Columna 'tipo' agregada a repuestos (opcional)")
+            else:
+                print("✓ Columna 'tipo' ya existe en repuestos")
+            
+            # Agregar columna 'descripcion_aduana' si no existe (opcional)
+            if 'descripcion_aduana' not in repuestos_columns:
+                print("Agregando columna 'descripcion_aduana' a la tabla repuestos...")
+                conn.execute(text("""
+                    ALTER TABLE repuestos 
+                    ADD COLUMN descripcion_aduana TEXT
+                """))
+                conn.commit()
+                print("✓ Columna 'descripcion_aduana' agregada a repuestos (opcional)")
+            else:
+                print("✓ Columna 'descripcion_aduana' ya existe en repuestos")
+            
+        print("Migraciones completadas exitosamente")
+        return True
+        
+    except SQLAlchemyError as e:
+        print(f"ERROR: Error ejecutando migraciones: {e}")
         return False
 
 def create_sample_data(engine):
@@ -444,6 +616,16 @@ def create_system_pages(engine):
                 "orden": 6,
                 "activa": True,
                 "solo_admin": False
+            },
+            {
+                "nombre": "ordenes_compra",
+                "ruta": "/ordenes-compra",
+                "titulo": "Órdenes de Compra",
+                "descripcion": "Gestión de pedidos de repuestos y seguimiento de órdenes",
+                "icono": "ShoppingCart",
+                "orden": 7,
+                "activa": True,
+                "solo_admin": False
             }
         ]
         
@@ -538,7 +720,12 @@ def create_admin_user(engine):
             ("maquinas_leer", "Ver máquinas", "maquinas", "leer"),
             ("maquinas_crear", "Crear máquinas", "maquinas", "crear"),
             ("maquinas_editar", "Editar máquinas", "maquinas", "editar"),
-            ("maquinas_eliminar", "Eliminar máquinas", "maquinas", "eliminar")
+            ("maquinas_eliminar", "Eliminar máquinas", "maquinas", "eliminar"),
+            ("ordenes_leer", "Ver órdenes de compra", "ordenes_compra", "leer"),
+            ("ordenes_crear", "Crear órdenes de compra", "ordenes_compra", "crear"),
+            ("ordenes_editar", "Editar órdenes de compra", "ordenes_compra", "editar"),
+            ("ordenes_eliminar", "Eliminar órdenes de compra", "ordenes_compra", "eliminar"),
+            ("ordenes_confirmar", "Confirmar llegada de repuestos", "ordenes_compra", "confirmar")
         ]
         
         for nombre, descripcion, recurso, accion in permisos_basicos:
@@ -608,6 +795,10 @@ def main():
         
         # Crear tablas
         if not create_tables(engine):
+            sys.exit(1)
+        
+        # Ejecutar migraciones de base de datos
+        if not migrate_database(engine):
             sys.exit(1)
         
         # Crear datos de ejemplo

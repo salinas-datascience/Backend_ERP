@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic_settings import BaseSettings
 
-from routers import proveedores, modelos_maquinas, maquinas, repuestos, historial, almacenamientos, auth, usuarios, admin
+from routers import proveedores, modelos_maquinas, maquinas, repuestos, historial, almacenamientos, auth, usuarios, admin, ordenes_compra
 
 
 class Settings(BaseSettings):
@@ -40,6 +40,7 @@ app.include_router(maquinas.router)
 app.include_router(repuestos.router)
 app.include_router(historial.router)
 app.include_router(almacenamientos.router)
+app.include_router(ordenes_compra.router)
 
 
 @app.get("/")
