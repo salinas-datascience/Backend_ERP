@@ -554,6 +554,16 @@ def migrate_pages_database(engine):
                 "orden": 6,
                 "activa": True,
                 "solo_admin": False
+            },
+            {
+                "nombre": "plan_mantenimiento",
+                "ruta": "/plan-mantenimiento",
+                "titulo": "Plan de Mantenimiento",
+                "descripcion": "Timeline de mantenimientos preventivos y programación",
+                "icono": "Calendar",
+                "orden": 5,
+                "activa": True,
+                "solo_admin": False
             }
         ]
         
@@ -826,6 +836,16 @@ def create_system_pages(engine):
                 "descripcion": "Dashboard con métricas de mantenimiento MTBF y MTTR",
                 "icono": "BarChart3",
                 "orden": 6,
+                "activa": True,
+                "solo_admin": False
+            },
+            {
+                "nombre": "plan_mantenimiento",
+                "ruta": "/plan-mantenimiento",
+                "titulo": "Plan de Mantenimiento",
+                "descripcion": "Timeline de mantenimientos preventivos y programación",
+                "icono": "Calendar",
+                "orden": 5,
                 "activa": True,
                 "solo_admin": False
             }
