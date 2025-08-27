@@ -34,10 +34,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-    # Comentar volumes y command para producción.
-    # volumes:
-    #   - ./app:/app
-    # command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+      
 
   db-init:
     build: .
